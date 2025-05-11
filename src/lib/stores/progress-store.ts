@@ -1,49 +1,80 @@
 import { create } from "zustand";
 
-interface VideoProgress {
+export type ProgressStatus = 
+  | "fetching"
+  | "downloading" 
+  | "completed"
+  | "error";
+
+export interface ProgressItem {
   title: string;
-  status: "init" | "fetching" | "downloading" | "converting" | "completed";
-  progress: number; // Progress percentage (0 to 1)
+  status: ProgressStatus;
+  progress: number;
 }
 
-type ProgressState = Record<string, VideoProgress>;
-
-interface ProgressStore {
-  progress: ProgressState;
-  startVideo: (videoId: string, title: string) => void;
-  setStatus: (videoId: string, status: VideoProgress["status"]) => void;
-  setProgress: (videoId: string, progress: number) => void;
+interface ProgressState {
+  progress: Record<string, ProgressItem>;
+  startVideo: (id: string, title: string) => void;
+  setStatus: (id: string, status: ProgressStatus) => void;
+  setProgress: (id: string, progress: number) => void;
+  setNotified: (id: string) => void;
   reset: () => void;
 }
 
-export const useProgressStore = create<ProgressStore>((set) => ({
+export const useProgressStore = create<ProgressState>((set) => ({
   progress: {},
-  startVideo: (videoId, title) =>
+  startVideo: (id, title) =>
     set((state) => ({
       progress: {
         ...state.progress,
-        [videoId]: { title, status: "fetching", progress: 0 },
-      },
-    })),
-  setStatus: (videoId, status) =>
-    set((state) => ({
-      progress: {
-        ...state.progress,
-        [videoId]: {
-          ...state.progress[videoId],
-          status,
+        [id]: {
+          title,
+          status: "fetching",
+          progress: 0,
         },
       },
     })),
-  setProgress: (videoId, progress) =>
-    set((state) => ({
-      progress: {
-        ...state.progress,
-        [videoId]: {
-          ...state.progress[videoId],
-          progress,
+  setStatus: (id, status) =>
+    set((state) => {
+      if (!state.progress[id]) return state;
+      
+      return {
+        progress: {
+          ...state.progress,
+          [id]: {
+            ...state.progress[id],
+            status,
+          },
         },
-      },
-    })),
+      };
+    }),
+  setProgress: (id, progress) =>
+    set((state) => {
+      if (!state.progress[id]) return state;
+      
+      return {
+        progress: {
+          ...state.progress,
+          [id]: {
+            ...state.progress[id],
+            progress,
+          },
+        },
+      };
+    }),
+  setNotified: (id) =>
+    set((state) => {
+      if (!state.progress[id]) return state;
+      
+      return {
+        progress: {
+          ...state.progress,
+          [id]: {
+            ...state.progress[id],
+            notified: true,
+          },
+        },
+      };
+    }),
   reset: () => set({ progress: {} }),
 }));

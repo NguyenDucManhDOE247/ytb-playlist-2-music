@@ -16,6 +16,7 @@ import hashlib
 import uuid
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_cors import CORS
 
 # Global variable to track temporary directories in use
 active_temp_dirs = set()
@@ -63,9 +64,9 @@ if sys.platform == 'win32':
 app = Flask(__name__)
 
 # Enable CORS
-from flask_cors import CORS
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
+# Configure rate limiter with more generous limits
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -127,7 +128,7 @@ def get_video_info(video_id):
         return info
 
 @app.route("/download", methods=['GET'])
-@limiter.limit("3/minute")
+@limiter.limit("10 per minute")  # Increased from 3 to 10 per minute
 def download_audio():
     t_start = time.time()  # Start timer for whole request
     video_id = request.args.get('videoId')
@@ -278,28 +279,10 @@ def root():
 max_workers = 3
 download_executor = ThreadPoolExecutor(max_workers=max_workers)
 
-# Add new endpoint to support concurrent downloads on the backend
-@app.route("/batch-download", methods=['POST'])
-def batch_download():
-    video_ids = request.json.get('videoIds', [])
-    if not video_ids:
-        return jsonify({"error": "No video IDs provided"}), 400
-        
-    # Limit the number of videos processed simultaneously
-    if len(video_ids) > 20:
-        return jsonify({"error": "Too many videos requested. Maximum 20 videos per batch."}), 400
-        
-    batch_id = str(uuid.uuid4())
-    os.makedirs(f"temp/{batch_id}", exist_ok=True)
-    add_temp_dir(f"temp/{batch_id}")
-    
-    # Start simultaneous processing on the server
-    futures = []
-    for video_id in video_ids:
-        futures.append(download_executor.submit(download_and_convert, video_id, batch_id))
-    
-    # Return batch_id so client can check status
-    return jsonify({"batch_id": batch_id, "total_videos": len(video_ids)}), 202
+# Function to download and convert a video (for batch jobs)
+def download_and_convert(video_id, batch_dir):
+    # Implementation would go here
+    pass
 
 if __name__ == '__main__':
     # Perform initial cleanup when starting server

@@ -3,24 +3,30 @@ import JSZip from "jszip";
 import { useCallback, useState } from "react";
 import { useProgressStore } from "../stores/progress-store";
 
-// Reduce the number of concurrent downloads to prevent overloading the server
-const MAX_CONCURRENT_CONVERSIONS = 2;
+// Reduce to just 1 download at a time to avoid rate limiting
+const MAX_CONCURRENT_CONVERSIONS = 1;
+// Increase delay between downloads
+const DELAY_BETWEEN_DOWNLOADS = 3000; // 3 seconds
 
 const fetchWithRetry = async (url: string, options: any, retries = 3) => {
   try {
-    return await fetch(url, options);
+    console.log(`Attempting to fetch: ${url}`);
+    const response = await fetch(url, options);
+    console.log(`Fetch response status: ${response.status}`);
+    return response;
   } catch (err) {
+    console.error(`Fetch error:`, err);
     if (retries <= 1) throw err;
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(`Waiting before retry...`);
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second wait before retry
     console.log(`Retrying fetch, ${retries-1} attempts left...`);
     return fetchWithRetry(url, options, retries-1);
   }
-}
+};
 
 const useBatchConversion = (videos: Video[]) => {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
-  const progressState = useProgressStore((state) => state.progress);
 
   const handleBatchConversion = useCallback(async () => {
     if (videos.length === 0) {
@@ -60,6 +66,17 @@ const useBatchConversion = (videos: Video[]) => {
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`Error fetching ${video.title}: ${response.status} - ${errorText}`);
+            
+            // If rate limited, wait longer and try again
+            if (response.status === 429) {
+              console.log("Rate limited, waiting 10 seconds before trying next video");
+              await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+              
+              // Mark as error but continue with next video
+              useProgressStore.getState().setStatus(videoId, "error");
+              continue;
+            }
+            
             throw new Error(`Failed to fetch: ${response.statusText}`);
           }
 
@@ -109,14 +126,28 @@ const useBatchConversion = (videos: Video[]) => {
           // Mark as completed
           useProgressStore.getState().setStatus(videoId, "completed");
           
+          // Wait longer between requests to avoid rate limiting
+          console.log(`Waiting ${DELAY_BETWEEN_DOWNLOADS/1000} seconds before next download`);
+          await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_DOWNLOADS));
+          
         } catch (error) {
           console.error(`Error processing ${video.title}:`, error);
           useProgressStore.getState().setStatus(videoId, "error");
           // Continue with next video instead of stopping the entire process
+          
+          // Wait a bit longer after an error
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
-        
-        // Pause a bit between requests to avoid overloading the server
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Check if we have any successful downloads
+      let successCount = 0;
+      Object.values(useProgressStore.getState().progress).forEach(item => {
+        if (item.status === "completed") successCount++;
+      });
+      
+      if (successCount === 0) {
+        throw new Error("No videos were successfully downloaded");
       }
 
       // Create ZIP file and start download
@@ -147,7 +178,7 @@ const useBatchConversion = (videos: Video[]) => {
       alert("Batch download complete!");
     } catch (error) {
       console.error("Error during batch conversion:", error);
-      alert(`An error occurred during batch conversion: ${error.message || "Unknown error"}. Please try again.`);
+      alert(`An error occurred during batch conversion: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`);
     } finally {
       setIsConverting(false);
     }

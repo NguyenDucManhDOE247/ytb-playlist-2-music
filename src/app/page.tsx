@@ -17,21 +17,21 @@ import { useFilteredVideos } from "@/lib/hooks/use-filtered-videos";
 import { useVideoSelection } from "@/lib/hooks/use-video-selection";
 import { useFetchPlaylistVideos } from "@/lib/hooks/use-get-playlist-videos";
 import useBatchConversion from "@/lib/hooks/use-batch-conversion";
+import { useProgressStore } from "@/lib/stores/progress-store";
 import { useSearchParams } from "next/navigation";
 
 export interface Video {
   id: string;
   title: string;
   thumbnail: string;
-  views: number; // Add views property
-  creator: string; // Add creator/channel property
+  views: number; 
+  creator: string;
 }
 
 export default function HomePage() {
   const [playlistUrl, setPlaylistUrl] = useState("");
   const params = useSearchParams();
-
-  console.log(params);
+  const progressState = useProgressStore((state) => state.progress);
 
   const {
     data: videos,
@@ -53,7 +53,7 @@ export default function HomePage() {
   const { selectedVideos, toggleSelection, deselectAll, selectAll } =
     useVideoSelection(videos);
 
-  const { handleBatchConversion, isConverting, progressState } =
+  const { handleBatchConversion, isConverting, downloadUrl } =
     useBatchConversion(selectedVideos);
 
   useEffect(() => {
@@ -150,6 +150,7 @@ export default function HomePage() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="flex items-center flex-wrap gap-4">
               <h2 className="text-xl shrink-0 grow font-semibold">
                 {filteredVideos.length} Playlist Videos:
@@ -181,9 +182,10 @@ export default function HomePage() {
             </div>
           </>
         )}
-        {isConverting && (
+        {isConverting && progressState && (
           <div className="flex flex-col gap-2">
-            {Object.entries(progressState).map(([videoId, status]) => {
+            {/* Fixed: Check if progressState exists before using Object.entries */}
+            {Object.entries(progressState || {}).map(([videoId, status]) => {
               if (!status || status.status === "completed") return null;
               return (
                 <div
