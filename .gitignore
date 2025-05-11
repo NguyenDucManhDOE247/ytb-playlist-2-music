@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,46 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python / Flask backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.env
+.venv
+instance/
+.webassets-cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+/temp/
+*.tmp
+*.temp
+
+# Flask specific
+.flask_session/
+
+# Downloaded media
+*.mp3
+*.webm
+*.m4a
+*.opus
+*.mp4
+
+# ffmpeg
+ffmpeg.exe
+ffprobe.exe
+ffplay.exe
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo

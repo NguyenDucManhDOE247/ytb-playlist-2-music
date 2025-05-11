@@ -16,10 +16,10 @@ const nextConfig: NextConfig = {
     return [
       {
         // Source path: The path Next.js receives from the frontend
-        source: "/api/youtube/download",
+        source: "/api/youtube/:path*",
         // Destination path: The URL of the Flask backend endpoint
         // NOTE: Ensure the port (5328) matches the port in backend/app.py
-        destination: "http://127.0.0.1:5328/download",
+        destination: "http://localhost:5328/:path*",
       },
       // Add other rewrites here if needed
     ];

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Ban, Eye, Pause, Play } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import Image from "next/image";
-import SingleDownloadButton from "./single-download-button";
+import { SingleDownloadButton } from "./single-download-button"; // Import the single download button
 
 interface VideoCardProps {
   video: Video;
@@ -56,8 +56,7 @@ const VideoCard = ({
           className={cn(
             "relative h-16 shrink-0 aspect-video flex items-center justify-center rounded-md overflow-hidden",
             !video.thumbnail && "bg-zinc-300"
-          )}
-        >
+          )}>
           {video.thumbnail ? (
             <Image
               src={video.thumbnail}

@@ -1,3 +1,5 @@
 yt-dlp
 requests
-Flask 
+Flask
+flask-cors
+flask-limiter

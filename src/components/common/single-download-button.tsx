@@ -1,116 +1,94 @@
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { toBlobURL } from "@ffmpeg/util";
-import { Loader2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
+import { useCallback, useMemo, useState } from "react";
 
-interface LocalDownloadButtonProps {
+interface SingleDownloadButtonProps {
   videoId: string;
   title: string;
 }
 
-const SingleDownloadButton = ({ videoId, title }: LocalDownloadButtonProps) => {
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [progress, setProgress] = useState<number>(0); // Tracks overall progress
-  const ffmpegRef = useRef<FFmpeg | null>(null);
-  const [status, setStatus] = useState<
-    "init" | "fetching" | "downloading" | "converting" | "finished"
-  >("init");
+type DownloadStatus = "init" | "fetching" | "downloading" | "finished";
 
-  const handleConversion = async () => {
+export function SingleDownloadButton({
+  videoId,
+  title,
+}: SingleDownloadButtonProps) {
+  const [status, setStatus] = useState<DownloadStatus>("init");
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  const startDownload = useCallback(async () => {
     setStatus("fetching");
+    setProgress(0);
 
     try {
-      // Fetch the audio stream from your server
+      // Fetch the MP3 directly from our API endpoint
       const response = await fetch(`/api/youtube/download?videoId=${videoId}`);
+      
       if (!response.ok) {
-        throw new Error("Failed to fetch audio stream.");
+        const errorText = await response.text();
+        console.error(`Error downloading: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to fetch: ${response.statusText}`);
       }
+
       setStatus("downloading");
-      setProgress(0); // Reset progress
-
-      const contentLength = Number(response.headers.get("Content-Length"));
+      
+      // Get content length for progress tracking
+      const contentLength = Number(response.headers.get("Content-Length") || "0");
       let downloadedSize = 0;
-
-      // Read response as stream and calculate download progress
+      
+      // Read the response stream
       const reader = response.body?.getReader();
       const chunks: Uint8Array[] = [];
-      if (reader) {
-        let done = false;
-        while (!done) {
-          const { value, done: readerDone } = await reader.read();
-          if (value) {
-            chunks.push(value);
-            downloadedSize += value.length;
-            console.log(
-              `Downloaded ${downloadedSize} bytes of ${contentLength}`
-            );
-            setProgress(downloadedSize / contentLength);
-          }
-          done = readerDone;
+      
+      if (!reader) throw new Error("Reader is undefined");
+      
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          downloadedSize += value.length;
+          setProgress(contentLength > 0 ? downloadedSize / contentLength : 0);
         }
       }
-      setStatus("converting");
-      setProgress(0); // Reset progress
-      const audioBlob = new Blob(chunks);
 
-      // Initialize FFmpeg
-      if (!ffmpegRef.current) {
-        ffmpegRef.current = new FFmpeg();
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
-        await ffmpegRef.current.load({
-          coreURL: await toBlobURL(
-            `${baseURL}/ffmpeg-core.js`,
-            "text/javascript"
-          ),
-          wasmURL: await toBlobURL(
-            `${baseURL}/ffmpeg-core.wasm`,
-            "application/wasm"
-          ),
-        });
+      // Get filename from Content-Disposition header or use video title
+      let filename = `${title.replace(/[^\w\s]/gi, "_").substring(0, 100)}.mp3`;
+      const contentDisposition = response.headers.get("Content-Disposition");
+      if (contentDisposition) {
+        const matches = /filename="([^"]+)"/.exec(contentDisposition);
+        if (matches && matches[1]) {
+          filename = matches[1];
+        }
       }
 
-      const ffmpeg = ffmpegRef.current;
-
-      // Write input file
-      const inputFileName = "input.webm";
-      const outputFileName = "output.mp3";
-
-      await ffmpeg.writeFile(
-        inputFileName,
-        new Uint8Array(await audioBlob.arrayBuffer())
-      );
-
-      // Track conversion progress
-      ffmpeg.on("progress", ({ progress }) => {
-        setProgress(progress);
-      });
-
-      // Execute conversion
-      await ffmpeg.exec(["-i", inputFileName, outputFileName]);
-
-      // Read the output file
-      const mp3Data = await ffmpeg.readFile(outputFileName);
-
-      // Create a Blob URL for the MP3 file
-      const mp3Blob = new Blob([mp3Data], { type: "audio/mpeg" });
+      // Create blob URL directly from received MP3 data
+      const mp3Blob = new Blob(chunks, { type: "audio/mpeg" });
       const mp3Url = URL.createObjectURL(mp3Blob);
 
       setDownloadUrl(mp3Url);
-    } catch (error) {
-      console.error("Error during audio conversion:", error);
-      alert("An error occurred during audio conversion. Please try again.");
-    } finally {
       setStatus("finished");
-      setProgress(0); // Reset progress after completion
+      
+      // Automatically download
+      const link = document.createElement("a");
+      link.href = mp3Url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error("Error during download:", error);
+      alert(`Download failed: ${error.message || "Unknown error"}`);
+      setStatus("init"); // Reset status to allow retrying
     }
-  };
+  }, [videoId, title]);
 
   const handleDownload = () => {
     if (downloadUrl) {
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${title.replace(/[^\w\s]/gi, "")}.mp3`;
+      link.download = `${title.replace(/[^\w\s]/gi, "_").substring(0, 100)}.mp3`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -124,37 +102,33 @@ const SingleDownloadButton = ({ videoId, title }: LocalDownloadButtonProps) => {
   const getStatusDisplay = () => {
     switch (status) {
       case "init":
-        return "Convert to MP3";
+        return "Download MP3";
       case "fetching":
-        return <Loader2 className="h-4 w-4 animate-spin" />;
+        return "Preparing...";
       case "downloading":
-        return `Downloading ${progressText}`;
-      case "converting":
-        return `Converting ${progressText}`;
+        return progressText;
       case "finished":
-        return "Click to download";
+        return "Download Again";
       default:
-        return "Unknown status";
+        return "Download";
     }
   };
 
   return (
-    <Button
-      variant={status === "finished" ? "default" : "outline"}
-      onClick={status === "finished" ? handleDownload : handleConversion}
-      disabled={status !== "init" && status !== "finished"}
-      className="relative w-full overflow-hidden"
-    >
-      {(status === "downloading" || status === "converting") && (
-        <div
-          className="absolute -z-10 top-0 left-0 bottom-0 bg-sky-500 transition-all"
-          style={{ width: `${progressText}` }}
-        />
-      )}
-
-      {getStatusDisplay()}
-    </Button>
+    <div className="flex gap-2 w-full">
+      <Button
+        onClick={status === "finished" ? handleDownload : startDownload}
+        disabled={status !== "init" && status !== "finished"}
+        className="flex-1"
+        variant={status === "finished" ? "outline" : "default"}
+        style={{
+          background: status === "downloading" 
+            ? `linear-gradient(to right, #3b82f6 ${progress * 100}%, #1e3a8a ${progress * 100}%)`
+            : undefined
+        }}
+      >
+        {getStatusDisplay()}
+      </Button>
+    </div>
   );
-};
-
-export default SingleDownloadButton;
+}
