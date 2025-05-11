@@ -199,6 +199,7 @@ Your application should now be running, typically at http://localhost:3000.
 - Consider using a more powerful server for heavy batch processing
 
 ## 📜 License
-[Your License]
+This project is licensed under the MIT License.  
+Copyright © 2025 Nguyen Duc Manh
 
 Enjoy using the YouTube Playlist MP3 Downloader! 🎧
