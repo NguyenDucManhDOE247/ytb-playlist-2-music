@@ -53,7 +53,7 @@ export default function HomePage() {
   const { selectedVideos, toggleSelection, deselectAll, selectAll } =
     useVideoSelection(videos);
 
-  const { handleBatchConversion, isConverting, downloadUrl } =
+  const { handleBatchConversion, isConverting, downloadUrl, totalChunks, currentChunk } =
     useBatchConversion(selectedVideos);
 
   useEffect(() => {
@@ -174,7 +174,9 @@ export default function HomePage() {
                 disabled={isConverting || selectedVideos.length === 0}
               >
                 {isConverting
-                  ? "Processing..."
+                  ? totalChunks > 0 
+                    ? `Processing chunk ${currentChunk}/${totalChunks}...` 
+                    : "Processing..."
                   : selectedVideos.length > 0
                   ? `Download ${selectedVideos.length} Videos`
                   : "Download"}
@@ -182,15 +184,20 @@ export default function HomePage() {
             </div>
           </>
         )}
-        {isConverting && progressState && (
-          <div className="flex flex-col gap-2">
-            {/* Fixed: Check if progressState exists before using Object.entries */}
+        {isConverting && (
+          <div className="flex flex-col gap-2 mt-4">
+            {totalChunks > 0 && (
+              <div className="text-sm text-center mb-2">
+                Processing chunk {currentChunk} of {totalChunks}
+              </div>
+            )}
+            
             {Object.entries(progressState || {}).map(([videoId, status]) => {
               if (!status || status.status === "completed") return null;
               return (
                 <div
                   key={videoId}
-                  className="w-full relative mt-4 h-8 border rounded-xl overflow-hidden flex items-center justify-center"
+                  className="w-full relative mt-2 h-8 border rounded-xl overflow-hidden flex items-center justify-center"
                 >
                   <div
                     className="absolute h-full w-0 left-0 -z-10 bg-white/20 transition-all duration-300 ease-in-out"
