@@ -40,6 +40,7 @@ const useBatchConversion = (videos: Video[]) => {
   const [isConverting, setIsConverting] = useState(false);
   const [currentChunk, setCurrentChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
+  const [completedChunks, setCompletedChunks] = useState(0);
 
   const handleBatchConversion = useCallback(async () => {
     if (videos.length === 0) {
@@ -47,6 +48,7 @@ const useBatchConversion = (videos: Video[]) => {
     }
 
     setIsConverting(true);
+    setCompletedChunks(0);
 
     try {
       // Get list of selected video IDs
@@ -55,7 +57,10 @@ const useBatchConversion = (videos: Video[]) => {
       
       // Split videos into manageable chunks
       const videoChunks = chunkArray(selectedVideoIds, CHUNK_SIZE);
-      setTotalChunks(videoChunks.length);
+      const totalChunksCount = videoChunks.length;
+      setTotalChunks(totalChunksCount);
+      
+      let successfulChunks = 0;
       
       // Process each chunk
       for (let chunkIndex = 0; chunkIndex < videoChunks.length; chunkIndex++) {
@@ -198,19 +203,27 @@ const useBatchConversion = (videos: Video[]) => {
           
           // Short pause between ZIP downloads
           await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Track completed chunks
+          successfulChunks++;
+          setCompletedChunks(successfulChunks);
         }
       }
 
-      alert(`Batch download complete! Downloaded in ${totalChunks} parts.`);
+      // Store the total number of chunks completed before showing alert
+      const finalCount = successfulChunks;
+      alert(`Batch download complete! Downloaded in ${finalCount} parts.`);
     } catch (error) {
       console.error("Error during batch conversion:", error);
-      alert(`An error occurred during batch conversion: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`);
+      // Get current count of completed chunks for the error message
+      const currentCompleted = completedChunks;
+      alert(`An error occurred during batch conversion ${currentCompleted > 0 ? `after downloading ${currentCompleted} parts` : ''}: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`);
     } finally {
       setIsConverting(false);
       setCurrentChunk(0);
       setTotalChunks(0);
     }
-  }, [videos]);
+  }, [videos, completedChunks]);
 
   return {
     handleBatchConversion,
@@ -218,6 +231,7 @@ const useBatchConversion = (videos: Video[]) => {
     downloadUrl,
     currentChunk,
     totalChunks,
+    completedChunks,
   };
 };
 

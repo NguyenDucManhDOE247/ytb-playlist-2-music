@@ -24,7 +24,7 @@ export interface Video {
   id: string;
   title: string;
   thumbnail: string;
-  views: number; 
+  views: number;
   creator: string;
 }
 
@@ -53,7 +53,7 @@ export default function HomePage() {
   const { selectedVideos, toggleSelection, deselectAll, selectAll } =
     useVideoSelection(videos);
 
-  const { handleBatchConversion, isConverting, downloadUrl, totalChunks, currentChunk } =
+  const { handleBatchConversion, isConverting, downloadUrl, totalChunks, currentChunk, completedChunks } =
     useBatchConversion(selectedVideos);
 
   useEffect(() => {
@@ -174,12 +174,12 @@ export default function HomePage() {
                 disabled={isConverting || selectedVideos.length === 0}
               >
                 {isConverting
-                  ? totalChunks > 0 
-                    ? `Processing chunk ${currentChunk}/${totalChunks}...` 
+                  ? totalChunks > 0
+                    ? `Processing chunk ${currentChunk}/${totalChunks}...`
                     : "Processing..."
                   : selectedVideos.length > 0
-                  ? `Download ${selectedVideos.length} Videos`
-                  : "Download"}
+                    ? `Download ${selectedVideos.length} Videos`
+                    : "Download"}
               </Button>
             </div>
           </>
@@ -189,9 +189,10 @@ export default function HomePage() {
             {totalChunks > 0 && (
               <div className="text-sm text-center mb-2">
                 Processing chunk {currentChunk} of {totalChunks}
+                {completedChunks > 0 && ` (${completedChunks} parts completed)`}
               </div>
             )}
-            
+
             {Object.entries(progressState || {}).map(([videoId, status]) => {
               if (!status || status.status === "completed") return null;
               return (
